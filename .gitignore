@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+data/client/local_share.enc
+data/client/local_share.nonce
+data/client/kdf_params.json
+data/client/backup_vault.enc
+data/client/backup_vault.nonce
+data/server/vault.db

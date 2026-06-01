@@ -1,0 +1,6 @@
+argon2-cffi
+click
+cryptography
+fastapi
+requests
+uvicorn

@@ -1,0 +1,25 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    container_name: vault_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/server:/app/data/server
+    environment:
+      - PYTHONPATH=/app/src
+
+  client:
+    build:
+      context: .
+      dockerfile: src/client/Dockerfile
+    container_name: vault_client
+    depends_on:
+      - server
+    volumes:
+      - ./data/client:/app/data/client
+    environment:
+      - PYTHONPATH=/app/src
+      - SERVER_URL=http://server:5000
