@@ -1,0 +1,2 @@
+class ServerUnavailableDuringInteraction(Exception):
+    pass
