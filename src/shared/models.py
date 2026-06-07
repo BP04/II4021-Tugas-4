@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass
+@dataclass(slots=True)
 class RecoveryShare:
     x: int
     y: str
@@ -17,19 +15,23 @@ class RecoveryShare:
         return RecoveryShare(x=int(data["x"]), y=str(data["y"]))
 
 
-@dataclass
+@dataclass(slots=True)
 class VaultEntry:
     service: str
     username: str
     password: str
-    note: str = ""
+    notes: str = ""
+
+    @property
+    def note(self) -> str:
+        return self.notes
 
     def to_dict(self) -> dict[str, str]:
         return {
             "service": self.service,
             "username": self.username,
             "password": self.password,
-            "note": self.note,
+            "notes": self.notes,
         }
 
     @staticmethod
@@ -38,11 +40,43 @@ class VaultEntry:
             service=str(data["service"]),
             username=str(data["username"]),
             password=str(data["password"]),
-            note=str(data.get("note", "")),
+            notes=str(data.get("notes", data.get("note", ""))),
         )
 
 
-@dataclass
+@dataclass(slots=True)
+class RecoveryShareVisualPaths:
+    share_one: str
+    share_two: str
+
+
+@dataclass(slots=True)
+class RecoverySharePreviewPaths:
+    qr_code: str
+    overlay: str
+
+
+@dataclass(slots=True)
+class CreatedVault:
+    recovery_share: str
+    share_one_png: bytes
+    share_two_png: bytes
+    preview_paths: RecoverySharePreviewPaths
+
+
+@dataclass(slots=True)
+class OpenVault:
+    username: str
+    entries: list[VaultEntry]
+    master_key: bytes
+    mode: str
+
+    @property
+    def readonly(self) -> bool:
+        return self.mode == "backup"
+
+
+@dataclass(slots=True)
 class VaultPayload:
     entries: list[VaultEntry] = field(default_factory=list)
 
