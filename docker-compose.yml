@@ -3,23 +3,27 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    container_name: vault_server
+    container_name: ${VAULT_DOCKER_SERVER_CONTAINER}
     ports:
-      - "5000:5000"
+      - "${VAULT_DOCKER_SERVER_HOST_PORT}:${VAULT_SERVER_PORT}"
     volumes:
-      - ./data/server:/app/data/server
+      - "${VAULT_DOCKER_SERVER_DATA}:/app/data/server"
     environment:
-      - PYTHONPATH=/app/src
+      PYTHONPATH: ${VAULT_DOCKER_PYTHONPATH}
+      VAULT_SERVER_BIND_HOST: ${VAULT_SERVER_BIND_HOST}
+      VAULT_SERVER_PORT: ${VAULT_SERVER_PORT}
+      VAULT_SERVER_DB_PATH: ${VAULT_DOCKER_SERVER_DB_PATH}
 
   client:
     build:
       context: .
       dockerfile: src/client/Dockerfile
-    container_name: vault_client
+    container_name: ${VAULT_DOCKER_CLIENT_CONTAINER}
     depends_on:
       - server
     volumes:
-      - ./data/client:/app/data/client
+      - "${VAULT_DOCKER_CLIENT_DATA}:/app/data/client"
     environment:
-      - PYTHONPATH=/app/src
-      - SERVER_URL=http://server:5000
+      PYTHONPATH: ${VAULT_DOCKER_PYTHONPATH}
+      VAULT_SERVER_URL: ${VAULT_DOCKER_SERVER_URL}
+      VAULT_CLIENT_DATA_DIR: ${VAULT_DOCKER_CLIENT_DATA_DIR}

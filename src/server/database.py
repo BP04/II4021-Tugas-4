@@ -32,8 +32,8 @@ class Database:
             raise ValueError("server user already exists") from exc
 
     def get_user(self, username: str) -> dict[str, bytes | str] | None:
-        with self._connect() as conn:
-            row = conn.execute(
+        with self._connect() as db:
+            row = db.execute(
                 "SELECT username, server_share, vault_blob, vault_nonce FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
@@ -58,8 +58,8 @@ class Database:
         }
 
     def update_vault(self, username: str, vault_blob: bytes, vault_nonce: bytes) -> bool:
-        with self._connect() as conn:
-            cursor = conn.execute(
+        with self._connect() as db:
+            cursor = db.execute(
                 """
                 UPDATE users
                 SET vault_blob = ?, vault_nonce = ?, updated_at = CURRENT_TIMESTAMP

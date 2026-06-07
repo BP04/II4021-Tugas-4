@@ -1,4 +1,4 @@
-from .manager import VaultManager
-from .storage import ClientStorage
+from .manager import VaultManager, VaultService
+from .storage import ClientStorage, ClientStore
 
-__all__ = ["VaultManager", "ClientStorage"]
+__all__ = ["VaultManager", "VaultService", "ClientStorage", "ClientStore"]
