@@ -91,6 +91,16 @@ class Database:
                 )
                 """
             )
+            self._migrate_schema(db)
+
+    def _migrate_schema(self, db: sqlite3.Connection) -> None:
+        columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
+        if "created_at" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN created_at TEXT")
+            db.execute("UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL")
+        if "updated_at" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN updated_at TEXT")
+            db.execute("UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL")
 
     def _require_user(self, username: str) -> sqlite3.Row:
         with self._connect() as db:
