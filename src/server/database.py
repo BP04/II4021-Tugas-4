@@ -1,71 +1,113 @@
-from __future__ import annotations
-
-import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+
+from shared.config import server_db_path
 
 
 class Database:
-    def __init__(self, db_path: str = "data/server/vault.db") -> None:
+    def __init__(self, db_path: str | None = None) -> None:
+        db_path = db_path or server_db_path()
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    server_share TEXT NOT NULL,
-                    vault_blob TEXT NOT NULL,
-                    vault_nonce TEXT NOT NULL
-                )
-                """
-            )
-            conn.commit()
-
     def create_user(
         self,
         username: str,
-        server_share: dict[str, Any],
-        vault_blob: str,
-        vault_nonce: str,
+        server_share: str,
+        vault_blob: bytes,
+        vault_nonce: bytes,
     ) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO users (username, server_share, vault_blob, vault_nonce) VALUES (?, ?, ?, ?)",
-                (username, json.dumps(server_share), vault_blob, vault_nonce),
-            )
-            conn.commit()
+        try:
+            with self._connect() as db:
+                db.execute(
+                    """
+                    INSERT INTO users (username, server_share, vault_blob, vault_nonce)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (username, server_share, vault_blob, vault_nonce),
+                )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("server user already exists") from exc
 
-    def get_user(self, username: str) -> dict[str, Any] | None:
+    def get_user(self, username: str) -> dict[str, bytes | str] | None:
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT username, server_share, vault_blob, vault_nonce FROM users WHERE username = ?",
                 (username,),
             ).fetchone()
-            if row is None:
-                return None
-            return {
-                "username": row["username"],
-                "server_share": json.loads(row["server_share"]),
-                "vault_blob": row["vault_blob"],
-                "vault_nonce": row["vault_nonce"],
-            }
+        if row is None:
+            return None
+        return {
+            "username": str(row["username"]),
+            "server_share": str(row["server_share"]),
+            "vault_blob": bytes(row["vault_blob"]),
+            "vault_nonce": bytes(row["vault_nonce"]),
+        }
 
-    def update_vault(self, username: str, vault_blob: str, vault_nonce: str) -> bool:
+    def load_server_share(self, username: str) -> str:
+        row = self._require_user(username)
+        return str(row["server_share"])
+
+    def load_vault_payload(self, username: str) -> dict[str, bytes]:
+        row = self._require_user(username)
+        return {
+            "vault": bytes(row["vault_blob"]),
+            "nonce": bytes(row["vault_nonce"]),
+        }
+
+    def update_vault(self, username: str, vault_blob: bytes, vault_nonce: bytes) -> bool:
         with self._connect() as conn:
             cursor = conn.execute(
-                "UPDATE users SET vault_blob = ?, vault_nonce = ? WHERE username = ?",
+                """
+                UPDATE users
+                SET vault_blob = ?, vault_nonce = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE username = ?
+                """,
                 (vault_blob, vault_nonce, username),
             )
-            conn.commit()
-            return cursor.rowcount > 0
+        return cursor.rowcount > 0
+
+    def is_available(self) -> bool:
+        try:
+            with self._connect() as db:
+                db.execute("SELECT 1").fetchone()
+        except sqlite3.Error:
+            return False
+        return True
+
+    def _init_db(self) -> None:
+        with self._connect() as db:
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    server_share TEXT NOT NULL,
+                    vault_blob BLOB NOT NULL,
+                    vault_nonce BLOB NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+    def _require_user(self, username: str) -> sqlite3.Row:
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT username, server_share, vault_blob, vault_nonce FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+        if row is None:
+            raise ValueError("server user data not found")
+        return row
+
+    @contextmanager
+    def _connect(self):
+        db = sqlite3.connect(self.db_path)
+        db.row_factory = sqlite3.Row
+        try:
+            yield db
+            db.commit()
+        finally:
+            db.close()
